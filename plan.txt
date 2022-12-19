@@ -1,0 +1,15 @@
+upload webpage to aws amplify
+- webpage has button to upload file
+- upload to github then attach that to amplify
+
+add aws cognito for sign in purposes
+
+create IAM role and policies to do action you want to do
+create lambda function for reading pdf to text and turning it to audio
+- possibly upload pdf to s3 bucket in frontend javascript, use presigned url from there to polly, upload audio to s3 bucket
+add dynamo db table
+- store audio bucket location user who upload details
+
+add api gateway so can call lambda function
+
+on webpage add player of audio and download button
