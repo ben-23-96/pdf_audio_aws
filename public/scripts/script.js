@@ -162,7 +162,7 @@ async function saveMp3ToSite(e) {
     console.log('saveMp3ToSite')
     tokens = getTokens()
     try {
-        const response = await fetch('https://ws206gr9jh.execute-api.eu-west-2.amazonaws.com/test/upload_key_to_table', {
+        const response = await fetch('https://ws206gr9jh.execute-api.eu-west-2.amazonaws.com/test/upload_key_to_user_table', {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
