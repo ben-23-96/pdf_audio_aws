@@ -1,8 +1,11 @@
-import { getS3PresignedUrl, uploadToS3, convertPdfToMp3, loadMp3OnPage, loadingSpinner, saveMp3ToSite, loadUserMp3Table, attemptAuthorizeUser, readCookie } from './functions.js'
+import { getS3PresignedUrl, uploadToS3, convertPdfToMp3, loadMp3OnPage, loadingSpinner, saveMp3ToSite, loadUserMp3Table, attemptAuthorizeUser, readCookie, setSignInOutLink, deleteUserMp3s } from './functions.js'
 
 let uploadPdfForm = document.querySelector('#pdfForm')
 console.log(uploadPdfForm)
 uploadPdfForm.addEventListener('submit', (e) => { uploadPDF(e) })
+
+let deleteButton = document.querySelector('#deleteButton')
+deleteButton.addEventListener('click', (e) => { deleteUserMp3s(e) })
 
 loadingSpinner({ state: 'off' })
 
@@ -11,21 +14,20 @@ console.log(document.cookie)
 
 let authorised = await attemptAuthorizeUser()
 if (authorised) {
+    setSignInOutLink({ authorised: true })
     let mp3UploadedBeforeSignIn = readCookie({ cookieKey: 'mp3key' })
     if (mp3UploadedBeforeSignIn) {
         saveMp3ToSite()
     }
     loadUserMp3Table()
+} else {
+    setSignInOutLink({ authorised: false })
 }
-
-//document.cookie = `mp3key=testsigninafterupload; path=/; max-age=0`
-
-//loadWebpageElements()
 
 async function uploadPDF(e) {
     e.preventDefault()
     console.log('uploadPdf')
-    loadingSpinner('on')
+    loadingSpinner({ state: 'on' })
 
     //get file from form
     let formdata = new FormData(e.target)
@@ -47,7 +49,7 @@ async function uploadPDF(e) {
     let mp3DownloadDataObj = await getS3PresignedUrl({ method: 'GET', file_type: 'mp3', key: mp3Key })
 
     // make mp3 available in audio player and download button
-    loadMp3OnPage({ url: mp3DownloadDataObj.presignedUrl, filename: filename })
+    loadMp3OnPage({ url: mp3DownloadDataObj.presignedUrl, filename: filename, key: mp3Key })
 
     loadingSpinner({ state: 'off' })
 

@@ -69,8 +69,8 @@ async function convertPdfToMp3({ key }) {
     }
 }
 
-function loadMp3OnPage({ url, filename = "" }) {
-    `loads mp3 audio into the audio player and makes it available via the download button on the webpage.
+function loadMp3OnPage({ url, filename = "", key }) {
+    `loads mp3 audio into the audio player and makes it available via the download button on the webpage. Adds to table if user signed in.
     :param url: string: aws presigned url to get the mp3 file from the s3 bucket.
     :param filename: string: the name of the file`
 
@@ -82,6 +82,85 @@ function loadMp3OnPage({ url, filename = "" }) {
     let downloadButton = document.querySelector('#downloadButton')
     downloadButton.href = url
     downloadButton.download = filename + ".mp3"
+
+    let authorised = readCookie({ cookieKey: 'Authorised' })
+    if (authorised) {
+        updateTableHTML({ presignedUrl: url, mp3Key: key })
+    }
+}
+
+function updateTableHTML({ presignedUrl, mp3Key }) {
+    `adds a row containing the mp3 key, a audioplayer, a download link and a checkbox to mark for deletion to the table.
+    :param presignedUrl: string: aws presignedUrl to get mp3, used to make mp3 available in audio player and downolad link.
+    :param mp3Key: string: the key to identify the mp3.`
+
+    let userMp3TableBody = document.querySelector('#userMp3TableBody')
+    console.log(mp3Key)
+    console.log(presignedUrl)
+    // set mp3 key as head of new table row
+    let tableRow = document.createElement('tr')
+    tableRow.setAttribute('id', `row-${mp3Key}`)
+    let tableHead = document.createElement('th')
+    tableHead.innerHTML = mp3Key
+    tableRow.appendChild(tableHead)
+    // create a audio player with the source a presigned url of the mp3, append it to a table data el and append that to the table row
+    let tableDataAudio = document.createElement('td')
+    let audioPlayer = document.createElement('audio')
+    audioPlayer.setAttribute('controls', true)
+    let audioSource = document.createElement('source')
+    audioSource.type = "audio/mpeg"
+    audioSource.src = presignedUrl
+    audioPlayer.appendChild(audioSource)
+    tableDataAudio.appendChild(audioPlayer)
+    audioPlayer.load()
+    tableRow.appendChild(tableDataAudio)
+    // create a link to download the mp3 using presigned url, append it to a table data el and append that to the table row
+    let tableDataButton = document.createElement('td')
+    let downloadButtonLink = document.createElement('a')
+    downloadButtonLink.setAttribute('href', presignedUrl)
+    downloadButtonLink.innerHTML = 'Download'
+    downloadButtonLink.className += 'btn btn-primary'
+    tableDataButton.appendChild(downloadButtonLink)
+    tableRow.appendChild(tableDataButton)
+    // create delete button
+    let deleteCheckBoxDiv = document.createElement('div')
+    deleteCheckBoxDiv.className += 'form-check'
+    let deleteCheckBoxInput = document.createElement('input')
+    deleteCheckBoxInput.className += 'form-check-input'
+    deleteCheckBoxInput.setAttribute('type', 'checkbox')
+    deleteCheckBoxInput.setAttribute('id', `checkbox-${mp3Key}`)
+    deleteCheckBoxDiv.appendChild(deleteCheckBoxInput)
+    tableRow.appendChild(deleteCheckBoxDiv)
+    // append table row to table
+    userMp3TableBody.appendChild(tableRow)
+}
+
+async function deleteUserMp3s(e) {
+    `Deletes user mp3s. Sends the mp3s marked for deletetion to aws endpoint to invoke a deletion lambda function. Alters table to no longer show deleted mp3s.`
+
+    e.preventDefault()
+    console.log('delete')
+    // get the ids of the checked checkboxs and add them to markedForDelete list 
+    let checkBoxes = document.querySelectorAll('.form-check-input')
+    let markedForDelete = []
+    for (let checkbox of checkBoxes) {
+        if (checkbox.checked) {
+            console.log(checkbox.id)
+            let key = checkbox.id.split('-')[1]
+            console.log(key)
+            markedForDelete.push(key)
+        }
+    }
+    console.log(markedForDelete)
+    // send list of mp3s to delete to aws endpoint for deletion 
+    let body = { "mp3Keys": markedForDelete }
+    let data = await invokeAWSLambda({ apiEndpoint: "delete_user_mp3s", body: body, authorization: true })
+    console.log(data)
+    // remove deleted mp3s from table
+    for (let key of markedForDelete) {
+        let deletedMp3TableRow = document.querySelector(`#row-${key}`)
+        deletedMp3TableRow.innerHTML = ""
+    }
 }
 
 function loadingSpinner({ state }) {
@@ -126,7 +205,6 @@ async function saveMp3ToSite() {
 
 }
 
-
 async function loadUserMp3Table() {
     `loads the logged in users saved mp3 files into a table after getting their presigned urls from a aws api endpoint`
 
@@ -139,6 +217,7 @@ async function loadUserMp3Table() {
             <th scope="col">File</th>
             <th scope="col">Player</th>
             <th scope="col">Download</th>
+            <th scopr="col">Select</th>
         </tr>
     </thead>
     <tbody id="userMp3TableBody">
@@ -151,39 +230,8 @@ async function loadUserMp3Table() {
         let userKeyUrlList = data.body
         console.log(userKeyUrlList)
 
-        let userMp3TableBody = document.querySelector('#userMp3TableBody')
-
         for (let obj of userKeyUrlList) {
-            let key = obj.mp3Key
-            let presignedUrl = obj.presignedUrl
-            console.log(key)
-            console.log(presignedUrl)
-            // set mp3 key as head of new table row
-            let tableRow = document.createElement('tr')
-            let tableHead = document.createElement('th')
-            tableHead.innerHTML = key
-            tableRow.appendChild(tableHead)
-            // create a audio player with the source a presigned url of the mp3, append it to a table data el and append that to the table row
-            let tableDataAudio = document.createElement('td')
-            let audioPlayer = document.createElement('audio')
-            audioPlayer.setAttribute('controls', true)
-            let audioSource = document.createElement('source')
-            audioSource.type = "audio/mpeg"
-            audioSource.src = presignedUrl
-            audioPlayer.appendChild(audioSource)
-            tableDataAudio.appendChild(audioPlayer)
-            audioPlayer.load()
-            tableRow.appendChild(tableDataAudio)
-            // create a link to download the mp3 using presigned url, append it to a table data el and append that to the table row
-            let tableDataButton = document.createElement('td')
-            let downloadButtonLink = document.createElement('a')
-            downloadButtonLink.setAttribute('href', presignedUrl)
-            downloadButtonLink.innerHTML = 'Download'
-            downloadButtonLink.className += 'btn btn-primary'
-            tableDataButton.appendChild(downloadButtonLink)
-            tableRow.appendChild(tableDataButton)
-            // append table row to table
-            userMp3TableBody.appendChild(tableRow)
+            updateTableHTML({ presignedUrl: obj.presignedUrl, mp3Key: obj.mp3Key })
         }
     } catch (error) {
         console.log(error)
@@ -227,7 +275,6 @@ async function invokeAWSLambda({ apiEndpoint, body, authorization = false }) {
     }
 }
 
-
 function readCookie({ cookieKey }) {
     `reads a cookie of a certain key
     :param cookieKey: string: the key of the the cookie
@@ -244,7 +291,6 @@ function readCookie({ cookieKey }) {
         return null
     }
 }
-
 
 async function attemptAuthorizeUser() {
     `Checks if valid jwt tokens can be retrieved for the user. Checks sessionstorage for id and access tokens and checks if they have not expired.
@@ -309,6 +355,12 @@ async function attemptAuthorizeUser() {
         let data = await response
         console.log(data)
         let jsonData = await data.json()
+        if (data.status != 200) {
+            // bad request user cannot be signed in clear and invalidate tokens
+            console.log(jsonData)
+            signOutUser()
+            return false
+        }
         console.log(jsonData)
         try {
             // save tokens and expiry time in sessionStorage set refreshtoken cookie if it doesnt already exist, set Authorised cookie
@@ -317,7 +369,7 @@ async function attemptAuthorizeUser() {
             let tokenExpiry = new Date(Date.now() + jsonData['expires_in'] * 1000)
             sessionStorage.setItem("tokenExpiry", tokenExpiry)
             if (!refreshToken) {
-                document.cookie = `refreshToken=${jsonData['refresh_token']}; path=/; max-age=10000`
+                document.cookie = `refreshToken=${jsonData['refresh_token']}; path=/; max-age=10000; samesite=lax`
             }
             document.cookie = `Authorised=${true}; path=/; expires=${tokenExpiry.toUTCString()}`
             return true
@@ -335,29 +387,57 @@ async function attemptAuthorizeUser() {
     }
 }
 
-//function loadWebpageElements() {
-//    document.cookie = `Authorised=${false}; path=/; max-age=0`
-//    console.log(document.cookie)
-//    let authorised = readCookie({ cookieKey: 'Authorised' })
-//    console.log(authorised)
-//    console.log(!!authorised)
-//    let audioPlayer = document.querySelector('#audioPlayer')
-//    audioPlayer.style.visibility = 'hidden'
-//    let downloadButton = document.querySelector('#downloadButton')
-//    downloadButton.style.visibility = 'hidden'
-//    let saveButton = document.querySelector('#saveButton')
-//    //saveButton.style.visibility = 'hidden'
-//    let authoriserLink = document.querySelector('#authoriserLink')
-//    if (!authorised) {
-//        authoriserLink.innerHTML = 'Sign in'
-//        authoriserLink.href = "https://pdfaudio.auth.eu-west-2.amazoncognito.com/login?response_type=code&client_id=1jdksnkvu02f7qvr5l7j7ichkf&redirect_uri=https://master.d31p3h7ojd8b9q.amplifyapp.com/"
-//    } else {
-//        authoriserLink.innerHTML = 'Sign out'
-//        authoriserLink.href = "https://pdfaudio.auth.eu-west-2.amazoncognito.com/logout?client_id=1jdksnkvu02f7qvr5l7j7ichkf&logout_uri=https://master.d31p3h7ojd8b9q.amplifyapp.com/"
-//    }
-//}
+async function signOutUser() {
+    `invalidates and removes all jwts. Clears sessionStorage, deletes refreshToken and authories cookies, send a post request to the
+    oauth2/revoke aws token endpoint which invalidates the current tokens, redirects back to home page.`
+
+    let refreshToken = readCookie({ cookieKey: 'refreshToken' })
+    let headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
+    let body = { token: refreshToken, client_id: '1jdksnkvu02f7qvr5l7j7ichkf' }
+    var formBody = [];
+    for (var property in body) {
+        var encodedKey = encodeURIComponent(property);
+        var encodedValue = encodeURIComponent(body[property]);
+        formBody.push(encodedKey + "=" + encodedValue);
+    }
+    formBody = formBody.join("&");
+    // clear session storage
+    sessionStorage.clear()
+    // remove refreshtoken and Authorised cookie
+    document.cookie = `refreshToken=remove; path=/; max-age=0`
+    document.cookie = `Authorised=remove; path=/; max-age=0`
+    // revoke jwt tokens
+    const response = await fetch('https://pdfaudio.auth.eu-west-2.amazoncognito.com/oauth2/revoke', {
+        method: 'POST',
+        headers: headers,
+        body: formBody
+    });
+    let data = await response
+    console.log(data)
+    console.log(data.json())
+    // redirect to page
+    //window.location.href = "http://127.0.0.1:5500"
+    window.location.replace("https://master.d31p3h7ojd8b9q.amplifyapp.com/")
+}
+
+function setSignInOutLink({ authorised }) {
+    `makes available the sign out link if user authoriesed and the sign in link if not.
+    :param authoried: boolean: true if user has valid jwt tokens false if not.`
+
+    let signInOutLink = document.querySelector('#signInOutLink')
+    if (!authorised) {
+        // set the href to aws hosted ui for cognito sign in
+        signInOutLink.innerHTML = 'Sign in'
+        signInOutLink.href = "https://pdfaudio.auth.eu-west-2.amazoncognito.com/login?response_type=code&client_id=1jdksnkvu02f7qvr5l7j7ichkf&redirect_uri=https://master.d31p3h7ojd8b9q.amplifyapp.com/"
+    } else {
+        // event listeners added if sign out to handle sign out
+        signInOutLink.innerHTML = 'Sign out'
+        signInOutLink.href = ""
+        signInOutLink.addEventListener('click', signOutUser)
+    }
+}
 
 
 
 
-export { getS3PresignedUrl, uploadToS3, convertPdfToMp3, loadMp3OnPage, loadingSpinner, saveMp3ToSite, loadUserMp3Table, attemptAuthorizeUser, readCookie }
+export { getS3PresignedUrl, uploadToS3, convertPdfToMp3, loadMp3OnPage, loadingSpinner, saveMp3ToSite, loadUserMp3Table, attemptAuthorizeUser, readCookie, setSignInOutLink, deleteUserMp3s }
