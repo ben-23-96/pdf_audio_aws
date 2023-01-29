@@ -1,3 +1,29 @@
-h1 {
-    color: aqua;
+.spinner-grow {
+    height: 4rem;
+    width: 4rem
+}
+
+#downloadButton {
+    visibility: hidden;
+}
+
+#audioPlayer {
+    visibility: hidden;
+}
+
+#deleteButton {
+    visibility: hidden;
+}
+
+#delete-spinner {
+    visibility: hidden;
+}
+
+#userMp3ModalButton {
+    visibility: hidden
+}
+
+.form-control {
+    border-color: #0275d8 !important;
+    border-width: thin;
 }
