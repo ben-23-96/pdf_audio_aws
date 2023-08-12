@@ -1,3 +1,4 @@
 idea.txt
 .env
-lambda_functions
+lambda_functions/pipfile
+lambda_functions/pipfile.lock
